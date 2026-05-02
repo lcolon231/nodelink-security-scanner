@@ -1,0 +1,65 @@
+{
+  "id": "cmoo_example_id",
+  "domain": "example-clinic.com",
+  "status": "completed",
+  "riskScore": 64,
+  "startedAt": "2025-11-15T18:42:11.000Z",
+  "completedAt": "2025-11-15T18:42:34.000Z",
+  "findings": [
+    {
+      "category": "email",
+      "checkId": "spf",
+      "title": "SPF record",
+      "severity": "pass",
+      "passed": true,
+      "description": "SPF record is present and uses an enforcing policy.",
+      "remediation": "No action needed. Review SPF includes annually as you change email providers.",
+      "evidence": { "record": "v=spf1 include:_spf.google.com -all" }
+    },
+    {
+      "category": "email",
+      "checkId": "dmarc",
+      "title": "DMARC policy",
+      "severity": "medium",
+      "passed": false,
+      "description": "DMARC is in monitor-only mode (p=none). Spoofed messages are not being blocked.",
+      "remediation": "Review DMARC aggregate reports for several weeks, fix any legitimate sources failing alignment, then move to p=quarantine and eventually p=reject.",
+      "evidence": { "record": "v=DMARC1; p=none; rua=mailto:reports@example-clinic.com", "policy": "none" }
+    },
+    {
+      "category": "tls",
+      "checkId": "tls_cert",
+      "title": "TLS certificate",
+      "severity": "pass",
+      "passed": true,
+      "description": "Valid certificate issued by Let's Encrypt, expires in 47 days. Protocol: TLSv1.3.",
+      "remediation": "No action needed. Confirm renewal automation is in place.",
+      "evidence": {
+        "subject": "example-clinic.com",
+        "issuer": "R3",
+        "validTo": "Jan  1 12:00:00 2026 GMT",
+        "daysUntilExpiry": 47,
+        "protocol": "TLSv1.3"
+      }
+    },
+    {
+      "category": "web",
+      "checkId": "header_hsts",
+      "title": "Header: strict-transport-security",
+      "severity": "high",
+      "passed": false,
+      "description": "HSTS forces browsers to use HTTPS for future visits. Without it, a downgrade attack on the first request is possible.",
+      "remediation": "Add: Strict-Transport-Security: max-age=31536000; includeSubDomains"
+    },
+    {
+      "category": "ports",
+      "checkId": "port_3389",
+      "title": "Port 3389 (RDP) exposed",
+      "severity": "critical",
+      "passed": false,
+      "description": "Port 3389 (RDP) is reachable from the public internet. Remote Desktop - never expose to the internet.",
+      "remediation": "Block RDP at the firewall. Require VPN or a Zero Trust gateway for remote access.",
+      "evidence": { "ip": "203.0.113.42", "port": 3389 }
+    }
+  ]
+}
