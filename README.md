@@ -1,14 +1,31 @@
 # NodeLink SMB Security Posture Scanner
 
-A lightweight external security assessment tool built for small-business prospects. Enter a domain, get a risk score, severity-ranked findings with remediation guidance, and a downloadable branded PDF report.
+> Lightweight external security assessment tool for small-business prospects. Enter a domain, get a 0-100 risk score, severity-ranked findings with plain-English remediation, and a downloadable branded PDF report.
 
 Built as a flagship project for NodeLink Technologies LLC. Production-ready Next.js, TypeScript, and pdf-lib.
 
-> **Demo flow:** prospect enters their domain, waits 15-30 seconds, gets a 0-100 score with a list of fixable issues. The branded PDF gives MSPs a concrete artifact to discuss. Prospects who score below 75 are warm leads.
+![Scan results page](./docs/screenshots/results.png)
+
+## Why this exists
+
+Most managed service providers (MSPs) sell cloud and security services to small businesses, but small business owners struggle to understand what they actually need. This tool turns "you should improve your security" into a concrete artifact: a 0-100 score and a branded PDF the prospect can read in five minutes.
+
+For NodeLink, this is a lead-generation tool. A prospect runs a scan, scores below 75, and now there is a specific reason to schedule a call. For a portfolio reviewer, it demonstrates real DNS, TLS, and network programming, plus product thinking about who the user is and what they need.
+
+## Demo flow
+
+1. Prospect enters their domain
+2. Scanner runs nine passive external checks in parallel (~15-30 seconds)
+3. Results page renders score, severity-sorted findings, and remediation
+4. Prospect downloads a branded PDF report
+
+![Home page](./docs/screenshots/home.png)
+
+![PDF report](./docs/screenshots/pdf-report.png)
 
 ## Features
 
-- 9 passive external checks: SPF, DKIM, DMARC, MX, DNS hygiene (NS, CAA), TLS certificate health and protocol, HTTP security headers, HTTPS redirect, exposed common ports.
+- Nine passive external checks: SPF, DKIM, DMARC, MX, DNS hygiene (NS, CAA), TLS certificate health and protocol, HTTP security headers, HTTPS redirect, exposed common ports.
 - Deterministic 0-100 risk score with explainable severity-based deductions.
 - Plain-English remediation written for non-technical owners, not security engineers.
 - Branded PDF report with logo, score card, executive summary, and per-finding fix boxes.
@@ -36,17 +53,10 @@ Use this tool only against domains you are authorized to assess (your own domain
 Requires Node.js 18.17+ (20+ recommended).
 
 ```bash
-# 1. Install
 npm install
-
-# 2. Environment
 cp .env.example .env
-
-# 3. Database
 npx prisma generate
 npx prisma db push
-
-# 4. Run
 npm run dev
 ```
 
@@ -54,25 +64,26 @@ Open http://localhost:3000 and scan a domain you control or have permission to a
 
 > **Windows note:** if `npx prisma db push` fails with EPERM (file in use), stop the dev server first, run the command, then restart `npm run dev`.
 
-> **Prisma version:** the project pins Prisma 5.x. Prisma 7 changed the schema syntax; do not upgrade without updating `schema.prisma` accordingly.
+> **Prisma version:** the project pins Prisma 5.x. Prisma 7 changed the schema syntax and is not compatible without changes.
 
 ## Project structure
-prototype/
-prisma/            # Prisma schema + dev.db SQLite file
-public/            # nodelink-logo.jpg embedded into PDF
-samples/           # Example scan output JSON
-src/
-app/             # Next.js routes (pages + API)
-api/scan/      # POST /api/scan, GET /api/scan/[id], GET /api/scan/[id]/pdf
-scan/[id]/     # Results page
-scans/         # History dashboard
-components/      # ScanForm, ScoreGauge, FindingCard, SeverityBadge
-lib/             # db, validation, rate limit, logger
-pdf/             # report.ts (pdf-lib generator)
-scanner/         # orchestrator + 9 check modules + scoring
+├── prisma/                 Prisma schema and dev SQLite database
+├── public/                 Logo embedded into PDF
+├── samples/                Example scan output JSON
+├── docs/screenshots/       README screenshots
+└── src/
+├── app/                Next.js routes (pages and API)
+│   ├── api/scan/       POST /api/scan, GET /api/scan/[id], /pdf
+│   ├── scan/[id]/      Results page
+│   └── scans/          History dashboard
+├── components/         ScanForm, ScoreGauge, FindingCard, SeverityBadge
+├── lib/                db, validation, rate limit, logger
+├── pdf/                pdf-lib report generator
+└── scanner/            Orchestrator + 9 check modules + scoring
+
 ## Scoring model
 
-Start at 100. Each failed check deducts based on severity. Floor at 0. Passing and informational findings deduct nothing.
+Start at 100. Each failed check deducts based on severity. Passing and informational findings deduct nothing.
 
 | Severity | Deduction |
 |----------|-----------|
@@ -84,8 +95,8 @@ Start at 100. Each failed check deducts based on severity. Floor at 0. Passing a
 
 Severity is intrinsic to each check, not derived from context. This keeps scoring deterministic and explainable.
 
-| Score | Band       |
-|-------|------------|
+| Score  | Band       |
+|--------|------------|
 | 90-100 | Strong     |
 | 75-89  | Good       |
 | 60-74  | Needs Work |
@@ -94,58 +105,57 @@ Severity is intrinsic to each check, not derived from context. This keeps scorin
 
 ## Sample scan output
 
-See `samples/scan-output.json` for an example of the JSON returned by `GET /api/scan/[id]`.
+See [`samples/scan-output.json`](./samples/scan-output.json) for an example of the JSON returned by `GET /api/scan/[id]`.
 
-## Security recommendations
+## Security recommendations for production deployment
 
-If you deploy this beyond a personal demo:
+The MVP is suitable for personal demos and authorized self-assessments. Before deploying for paid or multi-tenant use:
 
-1. **Authentication.** The MVP has no login. For multi-tenant or paid use, add NextAuth or Clerk and scope scans to the user.
+1. **Authentication.** Add NextAuth or Clerk and scope scans to the user.
 2. **Stronger rate limiting.** Replace the in-memory LRU with Upstash Redis or Vercel KV so limits survive restarts and work across serverless instances. Limit by both IP and account.
-3. **Domain ownership verification before reports are emailed.** A user can scan any domain right now. For automated email delivery, require the user to publish a TXT verification record before generating a branded PDF that names them as the requester.
-4. **Background jobs.** Synchronous scans block the request for 15-30 seconds. For better UX and timeout safety on serverless, move scans to a queue (Inngest, BullMQ, or Vercel Cron + a polled status endpoint).
-5. **Outbound network egress.** When deployed, ensure your hosting provider allows outbound TCP to common ports (22, 25, 3389, etc.). Some hosts block these.
-6. **Audit logging.** Record who scanned what and when. The current schema captures the domain and timestamp; expand to include IP, user-agent, and (when added) authenticated user ID.
-7. **Abuse prevention.** Block scans against well-known sensitive domains (government, banking, healthcare you don't have permission for). Maintain a deny-list.
-8. **Disclaimer.** The PDF footer and on-screen UI both clearly state this is a lightweight external assessment, not a penetration test. Keep that language.
+3. **Domain ownership verification before automated email reports.** Require a TXT verification record before generating a branded PDF that names the requester.
+4. **Background jobs.** Move scans to a queue (Inngest, BullMQ, or Vercel Cron + a polled status endpoint) for better UX and timeout safety on serverless.
+5. **Outbound network egress.** Ensure your hosting provider allows outbound TCP to common ports (22, 25, 3389, etc.).
+6. **Audit logging.** Expand the schema to include IP, user-agent, and authenticated user ID.
+7. **Abuse prevention.** Maintain a deny-list of sensitive domains (government, banking, healthcare you do not have permission to assess).
 
 ## Roadmap
 
 ### MVP (this codebase)
 
 - [x] Domain input + validation
-- [x] 9 passive external checks
+- [x] Nine passive external checks
 - [x] Risk scoring with explainable severity
 - [x] Results page with score gauge and findings
 - [x] Branded PDF report
 - [x] Scan history dashboard
 - [x] Per-IP rate limiting
 
-### v1 (next)
+### v1
 
 - [ ] User accounts (NextAuth)
-- [ ] Postgres in production (one env var change)
+- [ ] Postgres in production
 - [ ] Async scans with status polling
 - [ ] Email delivery of PDF reports (with domain ownership verification)
-- [ ] Scheduled re-scans (weekly/monthly per domain)
+- [ ] Scheduled re-scans
 - [ ] Diff between scans ("3 new issues since last week")
 - [ ] Logo upload per workspace (white-label for MSP partners)
 - [ ] Export to CSV / JSON
 
-### Premium / future
+### Premium
 
-- [ ] Subdomain enumeration (passive sources only: certificate transparency, DNS)
-- [ ] Cloud-misconfig hints from public metadata (S3/Azure blob naming patterns, exposed buckets)
-- [ ] Mailbox-level DKIM/DMARC alignment analysis (with consented inbox access)
+- [ ] Subdomain enumeration via certificate transparency and passive DNS
+- [ ] Cloud misconfiguration hints from public metadata
+- [ ] Mailbox-level DKIM/DMARC alignment with consented inbox access
 - [ ] HIPAA / SOC 2 control mapping in the PDF
-- [ ] Slack/Teams alerts when a tracked domain's score drops
-- [ ] API access for MSP integrations (PSA tools, RMM dashboards)
-- [ ] Vendor risk module (assess your suppliers' domains in bulk)
+- [ ] Slack/Teams alerts on score drops
+- [ ] API access for MSP integrations
+- [ ] Vendor risk module (assess suppliers in bulk)
 
 ## License
 
-Proprietary - NodeLink Technologies LLC. All rights reserved.
+MIT — see [LICENSE](./LICENSE).
 
 ## Disclaimer
 
-This tool provides a lightweight external assessment based on passive checks of public domain infrastructure. It is not a penetration test, not a comprehensive security audit, and does not guarantee the absence of vulnerabilities. Findings are advisory. Use against domains you own or have explicit authorization to assess.
+This tool provides a lightweight external assessment based on passive checks of public domain infrastructure. It is not a penetration test, not a comprehensive security audit, and does not guarantee the absence of vulnerabilities. Findings are advisory. Use only against domains you own or have explicit authorization to assess.
