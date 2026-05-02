@@ -67,20 +67,25 @@ Open http://localhost:3000 and scan a domain you control or have permission to a
 > **Prisma version:** the project pins Prisma 5.x. Prisma 7 changed the schema syntax and is not compatible without changes.
 
 ## Project structure
+
+```
+.
 ├── prisma/                 Prisma schema and dev SQLite database
 ├── public/                 Logo embedded into PDF
 ├── samples/                Example scan output JSON
 ├── docs/screenshots/       README screenshots
 └── src/
-├── app/                Next.js routes (pages and API)
-│   ├── api/scan/       POST /api/scan, GET /api/scan/[id], /pdf
-│   ├── scan/[id]/      Results page
-│   └── scans/          History dashboard
-├── components/         ScanForm, ScoreGauge, FindingCard, SeverityBadge
-├── lib/                db, validation, rate limit, logger
-├── pdf/                pdf-lib report generator
-└── scanner/            Orchestrator + 9 check modules + scoring
+    ├── app/                Next.js routes (pages and API)
+    │   ├── api/scan/       POST /api/scan, GET /api/scan/[id], /pdf
+    │   ├── scan/[id]/      Results page
+    │   └── scans/          History dashboard
+    ├── components/         ScanForm, ScoreGauge, FindingCard, SeverityBadge
+    ├── lib/                db, validation, rate limit, logger
+    ├── pdf/                pdf-lib report generator
+    └── scanner/            Orchestrator + 9 check modules + scoring
+```
 
+## Scoring model
 ## Scoring model
 
 Start at 100. Each failed check deducts based on severity. Passing and informational findings deduct nothing.
