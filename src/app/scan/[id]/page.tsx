@@ -1,7 +1,9 @@
+import { headers } from 'next/headers';
 import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { ScoreGauge } from '@/components/ScoreGauge';
 import { FindingCard, FindingProps } from '@/components/FindingCard';
+import { logEvent } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +16,17 @@ export default async function ScanResultPage({ params }: { params: Promise<{ id:
     include: { findings: true }
   });
   if (!scan) notFound();
+
+  // Build a fake Request from headers() so we can reuse the events helper
+  const hdrs = await headers();
+  const fakeReq = new Request('http://internal', { headers: hdrs });
+  logEvent({
+    eventType: 'results_viewed',
+    scanId: scan.id,
+    domain: scan.domain,
+    score: scan.riskScore,
+    request: fakeReq
+  });
 
   const sorted = [...scan.findings].sort(
     (a, b) =>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { generateReport } from '@/pdf/report';
+import { logEvent } from '@/lib/events';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -8,7 +9,7 @@ export const maxDuration = 30;
 type Sev = 'critical' | 'high' | 'medium' | 'low' | 'info' | 'pass';
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -34,6 +35,14 @@ export async function GET(
     }))
   });
 
+  logEvent({
+    eventType: 'pdf_downloaded',
+    scanId: scan.id,
+    domain: scan.domain,
+    score: scan.riskScore,
+    request: req
+  });
+
   return new NextResponse(new Uint8Array(buffer), {
     status: 200,
     headers: {
@@ -43,4 +52,3 @@ export async function GET(
     }
   });
 }
-

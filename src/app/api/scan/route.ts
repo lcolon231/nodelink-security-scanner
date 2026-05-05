@@ -4,6 +4,7 @@ import { checkRate } from '@/lib/rateLimit';
 import { prisma } from '@/lib/db';
 import { runScan } from '@/scanner';
 import { log } from '@/lib/logger';
+import { logEvent } from '@/lib/events';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (!rate.ok) {
     return NextResponse.json(
       { error: 'Rate limit exceeded. Try again later.' },
-      { status: 429 },
+      { status: 429 }
     );
   }
 
@@ -35,13 +36,22 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? 'Invalid domain' },
-      { status: 400 },
+      { status: 400 }
     );
   }
   const domain = parsed.data;
 
   const scan = await prisma.scan.create({
-    data: { domain, status: 'running' },
+    data: { domain, status: 'running' }
+  });
+
+  const startTime = Date.now();
+
+  logEvent({
+    eventType: 'scan_started',
+    scanId: scan.id,
+    domain,
+    request: req
   });
 
   try {
@@ -61,22 +71,46 @@ export async function POST(req: NextRequest) {
             passed: f.passed,
             description: f.description,
             remediation: f.remediation,
-            evidence: f.evidence ? JSON.stringify(f.evidence) : null,
-          })),
-        },
-      },
+            evidence: f.evidence ? JSON.stringify(f.evidence) : null
+          }))
+        }
+      }
     });
+
+    const durationMs = Date.now() - startTime;
+
+    logEvent({
+      eventType: 'scan_completed',
+      scanId: scan.id,
+      domain,
+      durationMs,
+      score: result.riskScore,
+      request: req
+    });
+
     return NextResponse.json({ id: scan.id, riskScore: result.riskScore }, { status: 201 });
   } catch (err) {
     log.error('scan failed', err);
+    const durationMs = Date.now() - startTime;
+
     await prisma.scan.update({
       where: { id: scan.id },
       data: {
         status: 'failed',
         completedAt: new Date(),
-        errorMsg: (err as Error).message,
-      },
+        errorMsg: (err as Error).message
+      }
     });
+
+    logEvent({
+      eventType: 'scan_failed',
+      scanId: scan.id,
+      domain,
+      durationMs,
+      metadata: { error: (err as Error).message },
+      request: req
+    });
+
     return NextResponse.json({ error: 'Scan failed', id: scan.id }, { status: 500 });
   }
 }
