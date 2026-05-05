@@ -8,14 +8,15 @@ datasource db {
 }
 
 model Scan {
-  id          String    @id @default(cuid())
+  id          String      @id @default(cuid())
   domain      String
   status      String
   riskScore   Int?
   errorMsg    String?
-  startedAt   DateTime  @default(now())
+  startedAt   DateTime    @default(now())
   completedAt DateTime?
   findings    Finding[]
+  events      ScanEvent[]
 
   @@index([domain])
   @@index([startedAt])
@@ -36,4 +37,24 @@ model Finding {
   createdAt   DateTime @default(now())
 
   @@index([scanId])
+}
+
+model ScanEvent {
+  id         String   @id @default(cuid())
+  scanId     String?
+  scan       Scan?    @relation(fields: [scanId], references: [id], onDelete: SetNull)
+  eventType  String
+  domain     String?
+  ipAddress  String?
+  country    String?
+  userAgent  String?
+  referrer   String?
+  durationMs Int?
+  score      Int?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([domain])
 }
